@@ -1,0 +1,37 @@
+PublicTransporatation 
+
+
+Project 1: Optimizing Public Transportation
+For your first project, you’ll be streaming public transit status using Kafka and the Kafka ecosystem to build a stream processing application that shows the status of trains in real-time
+
+
+-- CSV File for trips , trains and stations  /Bigdata/Kafka/data_001/PuplicTransportation.txt
+TrainID,TripID,City,ExpectedArrivalTime  ,ActualArrivalTime    ,ExpectedDepartureTime,ActualDepartureTime,Status
+'A001','T001','TIF','23-06-2020 08:00:00','23-06-2020 08:00:00','23-06-2020 09:00:00','23-06-2020 09:00:00','In time'
+'B001','T002','RUH','23-06-2020 09:00:00','23-06-2020 09:00:00','23-06-2020 10:00:00','23-06-2020 10:00:00','In time'
+'B001','T002','MED','23-06-2020 11:00:00','23-06-2020 11:00:00','23-06-2020 12:00:00','23-06-2020 12:30:00','Delayed'
+'A001','T001','JED','23-06-2020 13:00:00','23-06-2020 13:00:00','23-06-2020 14:00:00','23-06-2020 14:00:00','In time'
+
+
+-- Column Definitions of the CSV 
+TrainID     TripID      StationID       ExpectedArrivalTime   ActualArrivalTime       ExpectedDepartureTime        ActualDepartureTime               Status
+A001        T001        Taif            23-06-2020 08:00:00   23-06-2020 08:00:00     23-06-2020 09:00:00          23-06-2020 09:00:00              In time
+B001        T002        Riyadh          23-06-2020 09:00:00   23-06-2020 09:00:00     23-06-2020 10:00:00          23-06-2020 10:00:00              In time
+B001        T002        Madinah         23-06-2020 11:00:00   23-06-2020 11:00:00     23-06-2020 12:00:00          23-06-2020 12:30:00              Delayed for 30 Mins
+A001        T001        Jeddah          23-06-2020 13:00:00   23-06-2020 13:00:00     23-06-2020 14:00:00          23-06-2020 14:00:00              In time
+
+
+
+-- Connect to KafkStream 
+connect-standalone.sh $KAFKA_HOME/config/connect-standalone.properties $KAFKA_HOME/config/connect-file-source.properties $KAFKA_HOME/config/connect-file-sink.properties
+
+
+-- connect to the producer to load data to Kafka 
+kafka-console-producer.sh --broker-list bigdata01:9092 --topic PuplicTransportation < /Bigdata/Kafka/data_001/PuplicTransportation.txt
+ 
+
+
+
+
+-- Connect To Console as consumer to read the data 
+kafka-console-consumer.sh --bootstrap-server bigdata01:9092   bigdata01:2181  --topic PuplicTransportation --from-beginning 
