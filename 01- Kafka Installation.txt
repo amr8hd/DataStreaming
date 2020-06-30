@@ -1,0 +1,244 @@
+00- Definitions 
+
+1-	Kafka : is a general purpose publish / subscribe messaging system  used to process real data streaming  (developed by Linked In)
+1)	Kafka servers store all incoming messages for some period of time , and publishes them to a stream of data called a topic 
+2)	Kafka consumers (receivers )  subscribe to one or more topics , and receive data as it’s published 
+3)	A Stream / topic can have many different consumers , all with their own position in the stream maintained 
+4)	its not just for Hadoop 
+		consumers --> data receivers
+		producers  --> data producers  
+		broker --> the place where Kafka keep and maintain topics. each broker should have unique setting to not conflict with others 
+		placeholder -->  it’s the last read message in a topic 
+		retention period can be configured and its default value is seven days
+	
+ -- consumers of the same group will get the message distributed amongst them 
+ -- consumers of the different group will get their own copy of each message 
+
+
+
+01- Install Kafka 
+
+
+export KAFKA_HOME=/Bigdata/Kafka/kafka_2.13-2.5.0
+cd $KAFKA_HOME/bin/
+export PATH=/Bigdata/Kafka/kafka_2.13-2.5.0/bin:$PATH
+
+zookeeper-server-start.sh $KAFKA_HOME/config/zookeeper.properties
+kafka-server-start.sh $KAFKA_HOME/config/server.properties
+
+
+### To make it Auto Start as root
+
+    vi /etc/systemd/system/zookeeper.service
+    
+    
+    [Unit]
+    Description=Apache Zookeeper server
+    Documentation=http://zookeeper.apache.org
+    Requires=network.target remote-fs.target
+    After=network.target remote-fs.target
+    
+    [Service]
+    Type=simple
+    ExecStart=/Bigdata/Kafka/kafka_2.13-2.5.0/bin/zookeeper-server-start.sh /Bigdata/Kafka/kafka_2.13-2.5.0/config/zookeeper.properties
+    ExecStop=/Bigdata/Kafka/kafka_2.13-2.5.0/bin/zookeeper-server-stop.sh
+    Restart=on-abnormal
+    
+    [Install]
+    WantedBy=multi-user.target
+    
+    
+    
+    
+    
+    vi /etc/systemd/system/kafka.service
+    
+    [Unit]
+    Description=Apache Kafka Server
+    Documentation=http://kafka.apache.org/documentation.html
+    Requires=zookeeper.service
+    
+    [Service]
+    Type=simple
+    Environment="JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.252.b09-2.el7_8.x86_64/jre"
+    ExecStart=/Bigdata/Kafka/kafka_2.13-2.5.0/bin/kafka-server-start.sh /Bigdata/Kafka/kafka_2.13-2.5.0/config/server.properties
+    ExecStop=/Bigdata/Kafka/kafka_2.13-2.5.0/bin/kafka-server-stop.sh
+    
+    [Install]
+    WantedBy=multi-user.target
+  
+    
+    systemctl daemon-reload
+    systemctl start zookeeper
+
+
+
+
+02- Create a Topic in Kafka
+
+
+ kafka-topics.sh --create --zookeeper bigdata01:2181 --replication-factor 1 --partitions 1 --topic PuplicTransportation
+ 
+ kafka-topics.sh --list --zookeeper bigdata01:2181
+ 
+			kafka-topics.sh  : shell script for kafka topics 
+			create : command to create a new topic 
+			zookeeper : kafka depends on zookeeper to keep track of what topics  exist  , and here we specify on which zookeeper to use as it can be more than zookeeper , each handling its tasks
+			localhost:2181 : machine path & port of running zookeeper 
+			replication-factor : number of required replications 
+			partitions : number of partitions 
+			topic : to specify a name to topic / PuplicTransportation is topic name in this example 
+
+ 
+ 
+03-	run a producer to kafka : 
+  kafka-console-producer.sh --broker-list bigdata01:9092 --topic PuplicTransportation
+  
+		kafka-console-producer.sh -->  sample producer app that talks to kafka and publish data to it “we can use it as a gateway to kafka”
+		broker-list --> specify kafka server it self 
+		localhost:9092 : the server and port that we will listen on 
+	-- this will list to any standard input and will broadcast it to fred topic 
+	-- if we don’t redirect it to a file it will list to the keyboard 
+
+04- Consumer 
+  kafka-console-consumer.sh --bootstrap-server bigdata01:9092   bigdata01:2181  --topic PuplicTransportation --from-beginning 
+  
+  kafka-topics.sh --describe --topic PuplicTransportation --zookeeper bigdata01:2181
+  
+  
+5-	Alter and delete  topic  : 
+  ./kafka-topics.sh --zookeeper bigdata01:2181 --alter --topic PuplicTransportation --partitions 4
+    
+   vi ${kafka_home}/config/server.properties
+   delete.topic.enable=true
+   kafka-topics.sh --delete --zookeeper bigdata01:2181 --topic PuplicTransportation
+
+6-	Setting up multiple broker on a single machine :
+	 1-	open configuration path  cd config 
+     2- create a separate server.properties configuration file in addition to the existing one 
+	for example :
+	   you will find create server-0.properties, server-1.properties, server-3.properties ..etc
+	 3-	To start different kafka brokers :
+   from different terminal issue the command :
+	./kafka-server-start.sh confg/server-0.properties (on other terminal path the other property file and so on)
+
+
+
+
+07- Kafka File Stream
+
+cd /Bigdata/Kafka/kafka_2.13-2.5.0/config
+  
+  vi connect-standalone.properties
+	bootstrap.servers=bigdata01:9092
+	offset.storage.file.filename=/tmp/connect.offsets
+
+  
+  
+  vi connect-file-source.properties
+	name=local-file-source
+	connector.class=FileStreamSource
+	tasks.max=1
+	file=/Bigdata/Kafka/data_001/PuplicTransportation.txt
+	topic=PuplicTransportation
+
+  vi connect-file-sink.properties 
+	name=local-file-sink
+	connector.class=FileStreamSink
+	tasks.max=1
+	file=/Bigdata/Kafka/data_001/PuplicTransportation.sink.txt
+	topics=PuplicTransportation
+	
+	connect-standalone.sh $KAFKA_HOME/config/connect-standalone.properties $KAFKA_HOME/config/connect-file-source.properties $KAFKA_HOME/config/connect-file-sink.properties
+	
+	
+	echo "Ali Farid added new line for testing" >> /Bigdata/Kafka/data_001/PuplicTransportation.json
+	
+
+
+
+
+
+
+08- From Spark To Kafka 
+
+Create the Streaming DataFrame
+Now, we have to create a streaming DataFrame with schema defined in a variable called mySchema. If you drop any CSV file into dir, that will automatically change in the streaming DataFrame.
+
+val streamingDataFrame = spark.readStream.schema(mySchema).csv("path of your directory like home/Desktop/dir/")
+Publish the Stream to Kafka
+  
+Subscribe the Stream From Kafka 
+  import spark.implicits._
+val df = spark
+  .readStream
+  .format("kafka")
+  .option("kafka.bootstrap.servers", "localhost:9092")
+  .option("subscribe", "PuplicTransportation")
+  .load()
+  
+  
+Convert Stream According to mySchema and TimeStamp
+val df1 = df.selectExpr("CAST(value AS STRING)", "CAST(timestamp AS TIMESTAMP)").as[(String, Timestamp)]
+  .select(from_json($"value", mySchema).as("data"), $"timestamp")
+  .select("data.*", "timestamp")
+
+
+
+Print the DataFrame on Console
+Here, we just print our data to the console.
+
+df1.writeStream
+    .format("console")
+    .option("truncate","false")
+    .start()
+    .awaitTermination()
+
+
+
+from pyspark.sql import SparkSession
+import pyspark.sql.functions  
+from pyspark.sql.types import *
+from pyspark.sql.functions import udf
+from pyspark.sql.functions import asc
+from pyspark.sql.functions import desc
+from pyspark.sql.functions import sum as Fsum
+from pyspark.sql.types import StringType
+from pyspark.sql.types import IntegerType
+from pyspark.sql import Column
+from pyspark.sql.functions import udf, col
+from pyspark.sql.types import StringType, IntegerType, ArrayType, DataType
+from pyspark.sql.functions import col, unix_timestamp, to_date
+from pyspark.sql.functions import window, column, desc, col 
+spark = SparkSession.builder.master("local[1]").appName("Warngling Data").getOrCreate()
+spark.conf.set("spark.sql.shuffle.partitions", "1")
+
+schema = StructType([
+	StructField ('InvoiceNo',StringType(), True),
+	StructField ('StockCode',StringType(), True),
+	StructField ('Description',StringType(), True),
+	StructField ('Quantity',StringType(), True),
+	StructField ('InvoiceDate',StringType(), True),
+	StructField ('UnitPrice',StringType(), True),
+	StructField ('CustomerID',StringType(), True),
+	StructField ('Country',StringType(), True)
+])
+
+staticDataFrame=spark.readStream.format("csv").option("header", "true").schema(schema).load("/Bigdata/Spark/data_002/*.csv")
+staticDataFrame = staticDataFrame.withColumn("Quantity", staticDataFrame.Quantity.cast('float')).withColumn("UnitPrice", staticDataFrame.UnitPrice.cast('float'))
+staticDataFrame.schema
+
+streamingDataFrame=staticDataFrame.select( "CustomerId", (staticDataFrame.Quantity.cast('float')*staticDataFrame.UnitPrice.cast('float')).alias("total_cost"), "InvoiceDate").groupBy( col("CustomerId"), window(col("InvoiceDate"), "1 day")).sum("total_cost")
+
+## Write Stream to Kafka
+streamingDataFrame.writeStream.format("kafka").option("topic", "PuplicTransportation").option("kafka.bootstrap.servers", "bigdata:9092").start()
+
+
+## To have output on Screen 
+
+
+activityQueryB = streamingDataFrame.writeStream.format("console").outputMode("complete").start()
+
+
+## Read Stream From Kafka 
+df = spark.readStream.format("kafka").option("kafka.bigdata.servers", "bigdata01:9092").option("subscribe", "PuplicTransportation").load()
